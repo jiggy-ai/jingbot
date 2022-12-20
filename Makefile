@@ -10,9 +10,9 @@ help:
 .DEFAULT_GOAL := all
 
 build:
-	    docker build -t jiggyai/memobot:${TAG} .
+	    docker build -t jiggyai/jingbot:${TAG} .
 
 push:
-	    docker push jiggyai/memobot:${TAG}
+	    docker push jiggyai/jingbot:${TAG}
 
 all: build push

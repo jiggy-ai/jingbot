@@ -19,13 +19,12 @@ from readability import Document
 import whisper
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
-OPENAI_ENGINE="text-davinci-003"
+
+OPENAI_ENGINE = "text-davinci-003"
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
-
 whisper_model = whisper.load_model("large")
-
 
 session = requests.session()
 session.mount('https://', HTTPAdapter(max_retries=Retry(connect=5,
@@ -36,7 +35,7 @@ session.mount('https://', HTTPAdapter(max_retries=Retry(connect=5,
                                                         status_forcelist=(500, 502, 503, 504))))
 
 
-bot = ApplicationBuilder().token(os.environ['TELEGRAM_API_TOKEN']).build()
+bot = ApplicationBuilder().token(os.environ['JINGBOT_TELEGRAM_API_TOKEN']).build()
 
 
 def extract_text_from_html(content):
@@ -61,12 +60,12 @@ def url_to_response(url):
     query the url and return the text content
     raises exception if unable to adequately parse content
     """
-    resp = requests.get(url)
+    resp = session.get(url)
 
     if resp.status_code != 200:
         return f"Unable to GET contents of {url}"
 
-    PREPROMPT = "Provide a very detailed summary of the following web page, including what type of content it is (e.g. news article, essay, technical report, blog post, product documentation, content marketing, etc). If there is anything controversial please highlight the controversy. If there is something unique or clever, please highlight that as well:\n"
+    PREPROMPT = "Provide a detailed summary of the following web page. If there is anything controversial please highlight the controversy. If there is something surprising, unique or clever, please highlight that as well:\n"
     
     doc = Document(resp.text)
     text = extract_text_from_html(doc.summary())
@@ -79,7 +78,7 @@ def url_to_response(url):
     if token_count > MAX_INPUT_TOKENS:
         # crudely truncate longer texts to get it back down to approximately the target MAX_INPUT_TOKENS
         split_point = int((MAX_INPUT_TOKENS/token_count)*len(text))
-        percent = int(100*split_point/len(text))                
+        percent = int(100*split_point/len(text))
         text = text[:split_point]  + "<TRUNCATED>\n\n"
         response = f"Only first {percent}% of url content processed due to length."
     else:
