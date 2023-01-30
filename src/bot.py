@@ -166,7 +166,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     response = result['text']
     logger.info(response)
     #await update.message.reply_text(response)
-    await update.message.reply_text(response)
+    await update.message.reply_text(rtr.ask(response))
 
     
 bot.add_handler(MessageHandler(filters.VOICE & ~filters.COMMAND, voice_handler))
