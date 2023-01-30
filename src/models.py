@@ -5,10 +5,11 @@
 
 from typing import Optional, List
 from array import array
-from sqlmodel import Field, SQLModel, Column, ARRAY, Float
+from sqlmodel import Field, SQLModel, Column, ARRAY, Float, Enum
 from pydantic import  BaseModel, ValidationError, validator
 from pydantic import condecimal
 from time import time
+import enum
 
 
 timestamp = condecimal(max_digits=14, decimal_places=3)  # unix epoch timestamp decimal to millisecond precision
@@ -68,13 +69,13 @@ class Embedding(SQLModel, table=True):
     id:         int           = Field(default=None,
                                       primary_key=True,
                                       description='Unique database identifier for a given embedding vector.')
-    user_id     int           = Field(index=True,
+    user_id:    int           = Field(index=True,
                                       foreign_key='telegramuser.id',
                                       description='The user ID that generated the embedding')
-    memo_id     Optional[int] = Field(index=True,
+    memo_id:    Optional[int] = Field(index=True,
                                       foreign_key='memo.id',
                                       decsription='The memo that produced this embedding.')
-    summary_id  Optional[int] = Field(index=True,
+    summary_id: Optional[int] = Field(index=True,
                                       foreign_key='urlsummary.id',
                                       decsription='The summary that produced this embedding.')
     model:      str           = Field(description="The model used to produce this embedding.")    

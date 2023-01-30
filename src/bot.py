@@ -12,17 +12,18 @@ from requests.packages.urllib3 import Retry
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
 from bs4 import BeautifulSoup, NavigableString, Tag
-from transformers import GPT2Tokenizer
+import tiktoken
 import openai
 import re
 from readability import Document
 import whisper
+import rtr
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 
 OPENAI_ENGINE = "text-davinci-003"
 
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+tokenizer = tiktoken.get_encoding("gpt2")
 
 whisper_model = whisper.load_model("large")
 
@@ -73,7 +74,7 @@ def url_to_response(url):
     if not len(text) or text.isspace():
         return "Unable to extract text data from url"
     
-    token_count = len(tokenizer(text)['input_ids'])
+    token_count = len(tokenizer.encode(text)['input_ids'])
 
     if token_count > MAX_INPUT_TOKENS:
         # crudely truncate longer texts to get it back down to approximately the target MAX_INPUT_TOKENS
@@ -92,8 +93,15 @@ def url_to_response(url):
     logger.info(response)
     return response
 
-
-
+def is_url(msg : str) -> bool:
+    try:
+        re.search("(?P<url>https?://[^\s]+)", msg).group("url")
+        logger.info(f'url: {url}')
+        return True
+    except AttributeError:        
+        return False
+    
+    
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     handle message from user
@@ -102,16 +110,17 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text
     chat_id = update.message.chat_id
     logger.info(f"receive message {chat_id}: {text}")
-    try:
-        url = re.search("(?P<url>https?://[^\s]+)", text).group("url")
-    except AttributeError:        
-            return
-    logger.info(url)
+
+    def process():
+        if is_url(text):
+            return url_to_response(text)
+        else:
+            return rtr.ask(text)
 
     try:
-        response = url_to_response(url)
+        response = process()
     except Exception as e:
-        print(e)        
+        logger.exception(f"error handling message {text}")
         response = f'Unable to parse the url due to exception: {e}'
     await update.message.reply_text(response)
 
@@ -136,15 +145,19 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     except:
         pass
     await f.download_to_drive('voice.ogg')
-    
+    import hashlib
+    logger.info(hashlib.md5(open('voice.ogg', 'rb').read()).hexdigest())
+    logger.info(whisper_model.device)
     result = whisper_model.transcribe("voice.ogg", verbose=True, task='transcribe')
     logger.info(result)
     response = result['text']
     logger.info(response)
-    await update.message.reply_text(response)
+    #await update.message.reply_text(response)
 
     if result['language'] == 'en':
         # lanugage was english, simply return now
+        response = rtr.ask(result['text'])
+        await update.message.reply_text(response)
         return
 
     # now translate the result as well
@@ -152,6 +165,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info(result)
     response = result['text']
     logger.info(response)
+    #await update.message.reply_text(response)
     await update.message.reply_text(response)
 
     

@@ -5,12 +5,10 @@ WORKDIR /app
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y python3-pip ffmpeg git
+RUN apt-get update && apt-get upgrade -y && apt-get install -y python3-pip ffmpeg
 
 # update pip
 RUN pip3 install --upgrade pip
-
-RUN pip3 install git+https://github.com/openai/whisper.git
 
 # add requirements
 COPY ./requirements.txt /app/requirements.txt
