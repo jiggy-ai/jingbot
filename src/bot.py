@@ -115,7 +115,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if is_url(text):
             return url_to_response(text)
         else:
-            return rtr.ask(text)
+            return rtr.askchat(text)
 
     try:
         response = process()
@@ -156,7 +156,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if result['language'] == 'en':
         # lanugage was english, simply return now
-        response = rtr.ask(result['text'])
+        response = rtr.askchat(result['text'])
         await update.message.reply_text(response)
         return
 
@@ -166,7 +166,7 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     response = result['text']
     logger.info(response)
     #await update.message.reply_text(response)
-    await update.message.reply_text(rtr.ask(response))
+    await update.message.reply_text(rtr.askchat(response))
 
     
 bot.add_handler(MessageHandler(filters.VOICE & ~filters.COMMAND, voice_handler))

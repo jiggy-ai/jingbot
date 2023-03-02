@@ -1,4 +1,4 @@
-from jiggypedia import search
+from jiggypedia import wikipedia_search as search
 from langchain.llms import OpenAI
 import openai  # for retry on error
 #from langchain.prompts import PromptTemplate
@@ -42,12 +42,12 @@ def retry_llm(llm, prompt_text):
             print("failed to run llm", e)
         
 # qa llm used to perform the task of answering the question based on given context
-qa_llm = OpenAI(model_name=MODEL_NAME, temperature=QA_TEMPERATURE, max_tokens=-1)
+qa_llm = OpenAI(model_name=MODEL_NAME, temperature=QA_TEMPERATURE, max_tokens=400)
 
 @dynamic_prompt(llm=qa_llm, response_tokens=QA_RESPONSE_TOKENS)
 def qa_prompt(context : List[str],  question : str):
     prompt  = "Use the following Context to respond to the Question. "
-    prompt  = "Provide any additional relevant or interesting details from the Context. "
+    prompt += "Provide any additional relevant or interesting details from the Context. "
     prompt += "If the Context does not contain the required information for answering the Question "
     prompt += "then answer 'Not enough information'.\n"
     prompt += "If the Question is ambiguous or could have multiple answers, "
@@ -76,4 +76,32 @@ def ask(question, max_total_tokens=MAX_TOTAL_TOKENS, k=K):
     ret = retry_llm(qa_llm, prompt_text)
     logger.debug(ret)
     return ret
- 
+
+from chatstack import SystemMessage, UserMessage, ContextMessage, completion
+
+
+def askchat(question, max_total_tokens=MAX_TOTAL_TOKENS, k=K):
+    try:
+        results = search(question, k=k, max_total_tokens=max_total_tokens)
+    except Exception as ex:
+        logger.exception("search error", ex)
+        try:
+            results = search(question, k=k, max_total_tokens=max_total_tokens)
+        except Exception as ex:
+            logger.exception("search error again", ex)
+            return "Not enough information"
+    total_tokens = sum(r.token_count for r in results)
+    logger.info(f'total tokens {total_tokens} {len(results)}')
+
+    prompt  = "Use the following system context to respond to the User. "
+    prompt += "Provide any additional relevant or interesting details from the system context. "
+    prompt += "If the system context does not contain the required information for answering the user question "
+    prompt += "then answer 'Not enough information'.\n"
+    prompt += "If the user question is ambiguous or could have multiple answers, "
+    prompt += "respond with a question that would help clarify the ambiguity."    
+
+    messages  = [SystemMessage(text=prompt)]
+    messages += [ContextMessage(text=r.text) for r in results]
+    messages += [UserMessage(text=question)]
+
+    return completion(messages, temperature=QA_TEMPERATURE)
