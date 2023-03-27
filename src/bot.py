@@ -1,7 +1,7 @@
 """
 GPT URL summarizer & search Telegram Bot
 
-Copyright (C) 2022 William S. Kish
+This is an older version of the  bot based on text-davinci-003
 
 """
 from loguru import logger

@@ -56,7 +56,10 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"receive message {chat_id}: {text}")
 
     if chat_id not in chat_id_to_context:
-        await set_random_role(update)
+         chat_id_to_context[update.message.chat_id] = ChatContext(base_system_msg_text=prompts.prompts['Assistant'],
+                                                                  min_response_tokens=400,           # minimum number of tokens to reserve for model completion response;  max input context will be (4096 - min_response_tokens)
+                                                                  max_response_tokens=800,
+                                                                  temperature=0.5)
         
     chat_context = chat_id_to_context[chat_id]
 

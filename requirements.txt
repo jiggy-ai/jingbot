@@ -5,8 +5,7 @@ python-telegram-bot==20.b0
 BeautifulSoup4==4.11.2
 readability-lxml==0.8.1
 pdfminer.six==20221105
-openai-whisper==20230124
 tiktoken==0.2.0
 jiggypedia==0.0.5
 langchain==0.0.100
-
+sentence_transformers

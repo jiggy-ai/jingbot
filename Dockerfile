@@ -1,11 +1,12 @@
-FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
+FROM bitnami/python:3.10-prod   
 
 # set working directory
 WORKDIR /app
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y python3-pip ffmpeg
+#RUN apt-get update && apt-get upgrade -y && apt-get install -y python3-pip ffmpeg
+RUN apt-get update && apt-get upgrade -y && apt-get install -y python3-pip 
 
 # update pip
 RUN pip3 install --upgrade pip
@@ -17,8 +18,9 @@ COPY ./requirements.txt /app/requirements.txt
 RUN pip3 install -r requirements.txt
 
 COPY src/* .
+
 # download models
-RUN python3 dl.py  
+#RUN python3 dl.py  
 
 
 
