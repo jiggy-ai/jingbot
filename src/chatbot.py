@@ -4,6 +4,7 @@ Copyright (C) 2023 Jiggy AI LLC
 """
 from loguru import logger
 import os
+import telegram
 from telegram import Update
 from telegram.constants import ChatType, ParseMode
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ContextTypes, filters
@@ -13,6 +14,9 @@ import openai
 import re
 from readability import Document
 from random import choice
+import asyncio
+from time import time
+import re
 
 bot = ApplicationBuilder().token(os.environ['JINGBOT_TELEGRAM_API_TOKEN']).build()
 
@@ -29,6 +33,7 @@ async def set_random_role(update):
                                                              min_response_tokens=400,           # minimum number of tokens to reserve for model completion response;  max input context will be (4096 - min_response_tokens)
                                                              max_response_tokens=800,
                                                              temperature=0.7)
+from retry import retry
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -51,6 +56,12 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not text or text.isspace():
         return    
 
+    # send placeholder message to user
+    placeholder_message = await update.message.reply_text("...")
+
+    # send typing action
+    await update.message.chat.send_action(action="typing")
+     
     text = update.message.text
     chat_id = update.message.chat_id
     logger.info(f"receive message {chat_id}: {text}")
@@ -59,16 +70,45 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
          chat_id_to_context[update.message.chat_id] = ChatContext(base_system_msg_text=prompts.prompts['Assistant'],
                                                                   min_response_tokens=400,           # minimum number of tokens to reserve for model completion response;  max input context will be (4096 - min_response_tokens)
                                                                   max_response_tokens=800,
-                                                                  temperature=0.5)
-        
+                                                                  temperature=0.5)        
     chat_context = chat_id_to_context[chat_id]
+    gen = chat_context.user_message_stream(text)
+    last_time = time()
+    prev_reply_text = ""
+    target_dt = .1
+    async for status, reply_text in gen:
 
-    response_text = chat_context.user_message(text)
-    logger.info(f"send message {chat_id}: {response_text}")
-    try:
-        await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN)
-    except:
-        await update.message.reply_text(response_text)
+        if len(reply_text) > 4096:
+            await update.message.reply_text("response length exceeded")
+            # consider starting a new placeholder message
+            return
+                
+        target_dt = min(1, target_dt*1.05)
+        if time() - last_time < target_dt and status != "finished":
+            continue
+        last_time = time()
+
+        async def send_response():
+            try:
+                await context.bot.edit_message_text(reply_text, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, parse_mode=ParseMode.MARKDOWN)
+            except telegram.error.RetryAfter as e:
+                # 'telegram.error.RetryAfter: Flood control exceeded. Retry in 267 seconds'
+                logger.error(e)
+                pattern = r'\d+'
+                number = int(re.search(pattern, text).group())
+                logger.info(f'sleep {number}')
+                sleep(number)
+                await update.message.reply_text("<telegram rate limit exceeded>")
+            except telegram.error.BadRequest as e:
+                logger.error(e)
+                if str(e).startswith("Message is not modified"):
+                    return
+                else:
+                    await context.bot.edit_message_text(reply_text, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
+        await send_response()
+                
+    logger.info(f"send message {chat_id}: {reply_text}")
+
 
 
 

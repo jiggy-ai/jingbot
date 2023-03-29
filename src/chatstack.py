@@ -112,7 +112,49 @@ class ChatContext:
         logger.debug(f'completion response: {response}')        
         response_text = response['choices'][0]['message']['content']
         logger.info(f'completion response: {response_text}')
+        self.messages.insert(0, AssistantMessage(text=response_text))
         return response_text
+
+    @retry(tries=10, delay=.05, ExceptionToRaise=openai.error.InvalidRequestError)
+    async def _completion_stream(self, msgs :ChatRoleMessage) -> str:
+        oai_messages = [{"role": msg.role, "content": msg.text} for msg in msgs]
+        try:
+            r_gen = await openai.ChatCompletion.acreate(model=self.model,
+                                                        messages=oai_messages,
+                                                        stream=True,
+                                                        max_tokens = self.max_response_tokens)
+            response = ""
+            async for r_item in r_gen:
+                delta = r_item.choices[0].delta.get('content', '')
+                if delta:
+                    response += delta
+                    yield "not_finished", response
+            
+        except openai.error.RateLimitError as e:   
+            logger.warning(f"OpenAI RateLimitError: {e}")
+            raise
+        except openai.error.InvalidRequestError as e: # too many token
+            logger.error(f"OpenAI InvalidRequestError: {e}")
+            raise
+        except Exception as e:
+            logger.exception(e)
+            raise
+        response = response.strip()
+        self.messages.insert(0, AssistantMessage(text=response))
+        yield "finished", response
+
+
+    async def user_message_stream(self, msg_text) -> str:
+        msg = UserMessage(text=msg_text)
+        # put message at beginning of list
+        self.messages.insert(0, msg)
+        msgs = self._compose_completion_msg()
+        for msg in msgs:
+            logger.info(f"completion message: role {msg.role}: '{msg.text}'")
+        gen = self._completion_stream(msgs)
+        async for gen_item in gen:
+            yield gen_item
+
 
     
     def user_message(self, msg_text) -> str:
@@ -120,8 +162,6 @@ class ChatContext:
         # put message at beginning of list
         self.messages.insert(0, msg)
         response_text = self._completion(self._compose_completion_msg())
-        response_msg = AssistantMessage(text=response_text)
-        self.messages.insert(0, response_msg)
         return response_text
     
         
